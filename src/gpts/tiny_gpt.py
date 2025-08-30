@@ -42,14 +42,14 @@ class TinyGpt:
         )
         self.model = GPT2LMHeadModel(self._config)
 
-    def tokenize_fn(self, batch):
+    def _tokenize_fn(self, batch):
         return self._tokenizer(
             batch["text"], truncation=True, max_length=self._config.n_positions
         )
 
     def train(self, num_epochs: int = 1, batch_size: int = 8):
         tokenized_dataset = self._data_set.map(
-            self.tokenize_fn, batched=True, remove_columns=["text"]
+            self._tokenize_fn, batched=True, remove_columns=["text"]
         )
         data_collator = DataCollatorForLanguageModeling(self._tokenizer, mlm=False)
 

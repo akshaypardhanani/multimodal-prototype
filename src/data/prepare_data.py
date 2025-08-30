@@ -1,4 +1,7 @@
-from datasets import load_dataset
+import os
+
+
+from datasets import load_dataset, Dataset
 from pathlib import Path
 
 
@@ -22,3 +25,12 @@ def dataset_to_artifact(
         data_set.to_json(f"{artifacts_directory}/{Path(hf_dataset).stem}.jsonl")
     else:
         raise RuntimeError("Artifacts directory not created")
+
+
+def load_dataset_from_artifact(artifact_path: str, split: str) -> Dataset:
+    _, ext = os.path.splitext(artifact_path)
+    if ext.startswith(".json"):
+        loader_type = "json"
+    else:
+        loader_type = ext.replace(".", "")
+    return load_dataset(loader_type, data_files=artifact_path, split=split)

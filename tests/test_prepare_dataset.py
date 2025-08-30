@@ -8,4 +8,3 @@ def test_dataset_to_artifact():
 
     dataset_to_artifact(hf_dataset, split)
     assert Path("artifacts/TinyStories.jsonl").exists()
-    

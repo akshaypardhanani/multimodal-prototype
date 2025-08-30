@@ -13,7 +13,10 @@ def _artifact_dir(directory: str) -> bool:
         raise e
     return True
 
-def dataset_to_artifact(hf_dataset: str, split: str, artifacts_directory: str = 'artifacts'):
+
+def dataset_to_artifact(
+    hf_dataset: str, split: str, artifacts_directory: str = "artifacts"
+):
     data_set = load_dataset(hf_dataset, split=split)
     if _artifact_dir(artifacts_directory):
         data_set.to_json(f"{artifacts_directory}/{Path(hf_dataset).stem}.jsonl")

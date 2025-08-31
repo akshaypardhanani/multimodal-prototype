@@ -1,0 +1,37 @@
+{
+  "config": {
+    "dataset": {
+      "name": "wikitext",
+      "variant": "wikitext-2-raw-v1",
+      "split": "train",
+      "vocab_size": 32000
+    },
+    "model": {
+      "n_layer": 12,
+      "n_head": 12,
+      "n_embd": 768,
+      "n_positions": 512,
+      "vocab_size": 32000,
+      "save_dir": "artifacts/models"
+    },
+    "training": {
+      "num_epochs": 10,
+      "batch_size": 16,
+      "lr": 0.0003
+    },
+    "output_dir": "artifacts"
+  },
+  "metrics": {
+    "params_total": 124047360,
+    "params_per_layer_est": 7079424,
+    "hidden_size": 768,
+    "num_heads": 12,
+    "flops_per_forward_pass_est": 36238786560,
+    "memory_estimates": {
+      "weights_mb": 236.6,
+      "optimizer_states_mb": 709.8,
+      "activations_mb": 144.0,
+      "total_gb": 1.06
+    }
+  }
+}

@@ -1,0 +1,24 @@
+---
+defaults:
+  - _self_
+
+dataset:
+  name: wikitext
+  variant: wikitext-2-raw-v1
+  split: train
+  vocab_size: 32000
+
+model:
+  n_layer: 12
+  n_head: 12
+  n_embd: 768
+  n_positions: 512
+  vocab_size: ${dataset.vocab_size}
+  save_dir: ${output_dir}/models
+
+training:
+  num_epochs: 5
+  batch_size: 16
+  lr: 3e-4
+
+output_dir: artifacts

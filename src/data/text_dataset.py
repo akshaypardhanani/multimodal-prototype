@@ -1,13 +1,14 @@
 import multiprocessing
 
-from datasets import load_dataset
+from datasets import load_dataset, Dataset
+from torch.utils import data
 from torch.utils.data import Dataset
 from transformers import PreTrainedTokenizerBase
 
 
 class TextDataset(Dataset):
-    def __init__(self, dataset_name: str, split: str, tokenizer: PreTrainedTokenizerBase, block_size: int = 512):
-        self.dataset = load_dataset(dataset_name, split=split)
+    def __init__(self, dataset_name: str | Dataset, split: str, tokenizer: PreTrainedTokenizerBase, block_size: int = 512):
+        self.dataset = load_dataset(dataset_name, split=split) if isinstance(dataset_name, str) else dataset_name
 
         def tokenize_fn(examples):
             return tokenizer(examples["text"], truncation=False)
@@ -21,11 +22,17 @@ class TextDataset(Dataset):
         )
         
         def group_texts(examples):
-            concatenated = sum(examples["input_ids"], [])
-            total_length = (len(concatenated) // block_size) * block_size
+            concatenated_ids = sum(examples["input_ids"], [])
+            concatenated_attn_masks = sum(examples["attention_mask"], [])
+
+            total_length = (len(concatenated_ids) // block_size) * block_size
             return {
                 "input_ids": [
-                    concatenated[i : i + block_size]
+                    concatenated_ids[i : i + block_size]
+                    for i in range(0, total_length, block_size)
+                ],
+                "attention_mask": [
+                    concatenated_attn_masks[i : i + block_size]
                     for i in range(0, total_length, block_size)
                 ]
             }

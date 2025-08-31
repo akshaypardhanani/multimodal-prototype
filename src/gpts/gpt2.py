@@ -5,6 +5,7 @@ import torch
 
 from datasets import load_dataset
 from omegaconf import DictConfig
+from torch.optim import AdamW
 from torch.utils.data import DataLoader
 from transformers import GPT2Config, GPT2LMHeadModel, GPT2TokenizerFast
 
@@ -54,9 +55,9 @@ def train(cfg: DictConfig):
     else:
         model.to("cpu")
 
-    # num_params = count_parameters(model)
-    # metrics = compute_model_size(cfg, num_params)
     save_model_attributes(model, cfg, cfg.model.save_dir)
+
+    optimiser = AdamW(model.parameters(), lr=cfg.training.lr)
 
 if __name__ == "__main__":
     train()

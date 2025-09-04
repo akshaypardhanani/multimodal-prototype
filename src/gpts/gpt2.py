@@ -82,7 +82,7 @@ def train(cfg: DictConfig):
             inputs = batch["input_ids"].to(device)
             labels = inputs.clone().to(device)
 
-            outputs = model(inputs, labels=labels)
+            outputs = model(inputs)
             logits = outputs.logits
 
             shift_logits = logits[:, :-1, :].contiguous()

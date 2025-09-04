@@ -7,7 +7,7 @@ from datasets import load_dataset
 from omegaconf import DictConfig
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
-from transformers import GPT2Config, GPT2LMHeadModel, GPT2TokenizerFast
+from transformers import GPT2Config, GPT2LMHeadModel, GPT2TokenizerFast, get_scheduler
 
 from src.data.text_dataset import TextDataset
 from src.utils.parameters import count_parameters, compute_model_size, save_model_attributes
@@ -20,6 +20,7 @@ def train(cfg: DictConfig):
     """)
 
     dataset = load_dataset(cfg.dataset.name, cfg.dataset.variant, split=cfg.dataset.split)
+    device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else "cpu"
     texts = dataset["text"]
     tokenizer = GPT2TokenizerFast.from_pretrained("gpt2")
     if tokenizer.pad_token is None:
@@ -58,6 +59,36 @@ def train(cfg: DictConfig):
     save_model_attributes(model, cfg, cfg.model.save_dir)
 
     optimiser = AdamW(model.parameters(), lr=cfg.training.lr)
+    num_training_steps = cfg.training.num_epochs * len(data_loader)
+    lr_scheduler = get_scheduler(
+        "linear",
+        optimizer=optimiser,
+        num_warmup_steps=0,
+        num_training_steps=num_training_steps,
+    )
+
+    loss_fn = torch.nn.CrossEntropyLoss()
+
+    model.train()
+    for epoch in range(cfg.training.num_epochs):
+        for step, batch in enumerate(data_loader):
+            inputs = torch.tensor(batch["input_ids"]).to(device)
+            labels = inputs.clone().to(device)
+
+            outputs = model(inputs, labels=labels)
+            loss = outputs.loss
+
+            optimiser.zero_grad()
+            loss.backward()
+            optimiser.step()
+            lr_scheduler.step()
+
+            if step % 500 == 0:
+                print(f"Epoch {epoch}, Step {step}, Loss {loss.item()}")
+    
+    model.save_pretrained(cfg.model.save_dir)
+    tokenizer.save_pretrained(cfg.model.save_dir)
+
 
 if __name__ == "__main__":
     train()

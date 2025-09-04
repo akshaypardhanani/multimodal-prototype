@@ -12,6 +12,12 @@ from transformers import GPT2Config, GPT2LMHeadModel, GPT2TokenizerFast, get_sch
 from src.data.text_dataset import TextDataset
 from src.utils.parameters import count_parameters, compute_model_size, save_model_attributes
 
+
+def collate_fn(batch):
+    input_ids = torch.tensor([example["input_ids"] for example in batch], dtype=torch.long)
+    labels = torch.tensor([example["labels"] for example in batch], dtype=torch.long)
+    return {"input_ids": input_ids, "labels": labels}
+
 @hydra.main(config_path="../configs", config_name="gpt2.yml")
 def train(cfg: DictConfig):
     print(f"""
@@ -38,6 +44,7 @@ def train(cfg: DictConfig):
         batch_size=cfg.training.batch_size,
         shuffle=True,
         num_workers=multiprocessing.cpu_count(),
+        collate_fn=collate_fn
     )
 
     model_cfg = GPT2Config(
@@ -72,11 +79,15 @@ def train(cfg: DictConfig):
     model.train()
     for epoch in range(cfg.training.num_epochs):
         for step, batch in enumerate(data_loader):
-            inputs = torch.tensor(batch["input_ids"]).to(device)
+            inputs = batch["input_ids"].to(device)
             labels = inputs.clone().to(device)
 
             outputs = model(inputs, labels=labels)
-            loss = outputs.loss
+            logits = outputs.logits
+
+            shift_logits = logits[:, :-1, :].contiguous()
+            shift_labels = labels[:, 1:].contiguous()
+            loss = loss_fn(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
 
             optimiser.zero_grad()
             loss.backward()

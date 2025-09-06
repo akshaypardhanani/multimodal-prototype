@@ -5,6 +5,7 @@ import torch
 
 from datasets import load_dataset
 from omegaconf import DictConfig
+from torch.amp import autocast, GradScaler
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
 from transformers import GPT2Config, GPT2LMHeadModel, GPT2TokenizerFast, get_scheduler
@@ -76,22 +77,27 @@ def train(cfg: DictConfig):
 
     loss_fn = torch.nn.CrossEntropyLoss()
 
+    scaler = GradScaler(
+        device=device
+    )
+
     model.train()
     for epoch in range(cfg.training.num_epochs):
         for step, batch in enumerate(data_loader):
             inputs = batch["input_ids"].to(device)
             labels = inputs.clone().to(device)
-
-            outputs = model(inputs)
-            logits = outputs.logits
-
-            shift_logits = logits[:, :-1, :].contiguous()
-            shift_labels = labels[:, 1:].contiguous()
-            loss = loss_fn(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
-
             optimiser.zero_grad()
-            loss.backward()
-            optimiser.step()
+            with autocast(device_type=device, dtype=torch.float16):
+                outputs = model(inputs)
+                logits = outputs.logits
+
+                shift_logits = logits[:, :-1, :].contiguous()
+                shift_labels = labels[:, 1:].contiguous()
+                loss = loss_fn(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
+
+            scaler.scale(loss).backward()
+            scaler.step(optimiser)
+            scaler.update()
             lr_scheduler.step()
 
             if step % 500 == 0:

@@ -5,7 +5,7 @@ defaults:
 dataset:
   name: wikitext
   variant: wikitext-2-raw-v1
-  split: train
+  split: train[:1%]
   vocab_size: 32000
 
 model:
@@ -17,7 +17,7 @@ model:
   save_dir: ${output_dir}/models
 
 training:
-  num_epochs: 5
+  num_epochs: 1
   batch_size: 16
   lr: 3e-4
 

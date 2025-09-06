@@ -100,9 +100,9 @@ def train(cfg: DictConfig):
             scaler.update()
             lr_scheduler.step()
 
-            if step % 500 == 0:
+            if step % 50 == 0:
                 print(f"Epoch {epoch}, Step {step}, Loss {loss.item()}")
-    
+    print(f"Epoch {epoch}, Step {step}, Loss {loss.item()}")
     model.save_pretrained(cfg.model.save_dir)
     tokenizer.save_pretrained(cfg.model.save_dir)
 

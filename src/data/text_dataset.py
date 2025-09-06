@@ -11,7 +11,7 @@ class TextDataset(Dataset):
         self.dataset = load_dataset(dataset_name, split=split) if isinstance(dataset_name, str) else dataset_name
 
         def tokenize_fn(examples):
-            return tokenizer(examples["text"], truncation=False)
+            return tokenizer(examples["text"], truncation=True, max_length=block_size, return_overflowing_tokens=False)
 
         tokenized = self.dataset.map(
             tokenize_fn,

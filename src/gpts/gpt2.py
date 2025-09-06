@@ -1,5 +1,6 @@
 import hydra
 import multiprocessing
+import time
 import torch
 
 
@@ -83,7 +84,9 @@ def train(cfg: DictConfig):
 
     model.train()
     for epoch in range(cfg.training.num_epochs):
+        epoch_start_time = time.time()
         for step, batch in enumerate(data_loader):
+            step_start_time = time.time()
             inputs = batch["input_ids"].to(device)
             labels = inputs.clone().to(device)
             optimiser.zero_grad()
@@ -101,7 +104,8 @@ def train(cfg: DictConfig):
             lr_scheduler.step()
 
             if step % 50 == 0:
-                print(f"Epoch {epoch}, Step {step}, Loss {loss.item()}")
+                print(f"Epoch {epoch}, Step {step}, Loss {loss.item()}, step took {time.time() - step_start_time}")
+        print(f"Epoch took: {time.time() - epoch_start_time}")
     print(f"Epoch {epoch}, Step {step}, Loss {loss.item()}")
     model.save_pretrained(cfg.model.save_dir)
     tokenizer.save_pretrained(cfg.model.save_dir)

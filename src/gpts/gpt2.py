@@ -4,9 +4,9 @@ import time
 import torch
 
 
+from accelerate import Accelerator
 from datasets import load_dataset
 from omegaconf import DictConfig
-from torch.amp import autocast, GradScaler
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
 from transformers import GPT2Config, GPT2LMHeadModel, GPT2TokenizerFast, get_scheduler
@@ -22,6 +22,7 @@ def collate_fn(batch):
 
 @hydra.main(config_path="../configs", config_name="gpt2.yml")
 def train(cfg: DictConfig):
+    accelerate = Accelerator()
     print(f"""
     Training GPT-2 with the following configuration:
     {cfg}
@@ -76,11 +77,11 @@ def train(cfg: DictConfig):
         num_training_steps=num_training_steps,
     )
 
-    loss_fn = torch.nn.CrossEntropyLoss()
-
-    scaler = GradScaler(
-        device=device
+    model, optimiser, data_loader, lr_scheduler = accelerate.prepare(
+        model, optimiser, data_loader, lr_scheduler
     )
+
+    loss_fn = torch.nn.CrossEntropyLoss()
 
     model.train()
     for epoch in range(cfg.training.num_epochs):
@@ -90,7 +91,7 @@ def train(cfg: DictConfig):
             inputs = batch["input_ids"].to(device)
             labels = inputs.clone().to(device)
             optimiser.zero_grad()
-            with autocast(device_type=device, dtype=torch.float16):
+            with accelerate.autocast():
                 outputs = model(inputs)
                 logits = outputs.logits
 
@@ -98,9 +99,8 @@ def train(cfg: DictConfig):
                 shift_labels = labels[:, 1:].contiguous()
                 loss = loss_fn(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
 
-            scaler.scale(loss).backward()
-            scaler.step(optimiser)
-            scaler.update()
+            accelerate.backward(loss)
+            optimiser.step()
             lr_scheduler.step()
 
             if step % 50 == 0:

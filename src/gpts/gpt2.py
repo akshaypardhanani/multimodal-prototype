@@ -8,7 +8,7 @@ from accelerate import Accelerator
 from datasets import load_dataset
 from omegaconf import DictConfig
 from torch.optim import AdamW
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, DistributedSampler
 from transformers import GPT2Config, GPT2LMHeadModel, GPT2TokenizerFast, get_scheduler
 
 from src.data.text_dataset import TextDataset
@@ -28,6 +28,11 @@ def train(cfg: DictConfig):
     {cfg}
     """)
 
+    print("-------------------------------------")
+
+    print(f"[Process {accelerate.process_index}] Starting training on device {accelerate.device} "
+          f"(total processes = {accelerate.num_processes})")
+
     dataset = load_dataset(cfg.dataset.name, cfg.dataset.variant, split=cfg.dataset.split)
     device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else "cpu"
     texts = dataset["text"]
@@ -42,13 +47,27 @@ def train(cfg: DictConfig):
         block_size=cfg.model.n_positions,
     )
 
+    sampler = DistributedSampler(data_set, num_replicas=accelerate.num_processes, rank=accelerate.process_index, shuffle=True)
+
     data_loader = DataLoader(
         data_set,
         batch_size=cfg.training.batch_size,
-        shuffle=True,
+        # shuffle=True,
+        sampler=sampler,
         num_workers=multiprocessing.cpu_count(),
         collate_fn=collate_fn
     )
+
+    # Peek one batch to check shapes
+    batch = next(iter(data_loader))
+    print(f"[Process {accelerate.process_index}] Per-process batch shape: {batch['input_ids'].shape}")
+
+    global_batch_size = cfg.training.batch_size * accelerate.num_processes
+    print(f"[Process {accelerate.process_index}] Effective global batch size: {global_batch_size}")
+
+    steps_per_epoch = len(data_loader)  # length per process
+    print(f"[Process {accelerate.process_index}] Steps per epoch (per process): {steps_per_epoch}")
+
 
     model_cfg = GPT2Config(
         vocab_size=len(tokenizer),
@@ -105,6 +124,7 @@ def train(cfg: DictConfig):
 
             if step % 50 == 0:
                 print(f"Epoch {epoch}, Step {step}, Loss {loss.item()}, step took {time.time() - step_start_time}")
+                print(f"[Process {accelerate.process_index}] Step 0 batch shape: {batch['input_ids'].shape}")
         print(f"Epoch took: {time.time() - epoch_start_time}")
     print(f"Epoch {epoch}, Step {step}, Loss {loss.item()}")
     model.save_pretrained(cfg.model.save_dir)

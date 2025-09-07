@@ -1,4 +1,5 @@
 import hydra
+import os
 import multiprocessing
 import time
 import torch
@@ -8,7 +9,7 @@ from accelerate import Accelerator
 from datasets import load_dataset
 from omegaconf import DictConfig
 from torch.optim import AdamW
-from torch.utils.data import DataLoader, DistributedSampler
+from torch.utils.data import DataLoader
 from transformers import GPT2Config, GPT2LMHeadModel, GPT2TokenizerFast, get_scheduler
 
 from src.data.text_dataset import TextDataset
@@ -47,13 +48,10 @@ def train(cfg: DictConfig):
         block_size=cfg.model.n_positions,
     )
 
-    sampler = DistributedSampler(data_set, num_replicas=accelerate.num_processes, rank=accelerate.process_index, shuffle=True)
-
     data_loader = DataLoader(
         data_set,
         batch_size=cfg.training.batch_size,
-        # shuffle=True,
-        sampler=sampler,
+        shuffle=True,
         num_workers=multiprocessing.cpu_count(),
         collate_fn=collate_fn
     )
@@ -92,7 +90,7 @@ def train(cfg: DictConfig):
     lr_scheduler = get_scheduler(
         "linear",
         optimizer=optimiser,
-        num_warmup_steps=0,
+        num_warmup_steps=int(steps_per_epoch * 0.1),
         num_training_steps=num_training_steps,
     )
 
@@ -126,8 +124,10 @@ def train(cfg: DictConfig):
                 print(f"Epoch {epoch}, Step {step}, Loss {loss.item()}, step took {time.time() - step_start_time}")
                 print(f"[Process {accelerate.process_index}] Step 0 batch shape: {batch['input_ids'].shape}")
         print(f"Epoch took: {time.time() - epoch_start_time}")
+        accelerate.save_state(f"{os.getcwd()}/outputs/checkpoints")
     print(f"Epoch {epoch}, Step {step}, Loss {loss.item()}")
-    model.save_pretrained(cfg.model.save_dir)
+    accelerate.wait_for_everyone()
+    accelerate.unwrap_model(model).save_pretrained(cfg.model.save_dir)
     tokenizer.save_pretrained(cfg.model.save_dir)
 
 

@@ -213,3 +213,4 @@ llms.txt
 .hydra
 
 outputs/
+tests/assets

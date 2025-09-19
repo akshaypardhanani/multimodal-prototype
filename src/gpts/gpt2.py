@@ -13,13 +13,20 @@ from torch.utils.data import DataLoader
 from transformers import GPT2Config, GPT2LMHeadModel, GPT2TokenizerFast, get_scheduler
 
 from src.data.text_dataset import TextDataset
-from src.utils.parameters import count_parameters, compute_model_size, save_model_attributes
+from src.utils.parameters import (
+    count_parameters,
+    compute_model_size,
+    save_model_attributes,
+)
 
 
 def collate_fn(batch):
-    input_ids = torch.tensor([example["input_ids"] for example in batch], dtype=torch.long)
+    input_ids = torch.tensor(
+        [example["input_ids"] for example in batch], dtype=torch.long
+    )
     labels = torch.tensor([example["labels"] for example in batch], dtype=torch.long)
     return {"input_ids": input_ids, "labels": labels}
+
 
 @hydra.main(config_path="../configs", config_name="gpt2.yml")
 def train(cfg: DictConfig):
@@ -31,11 +38,19 @@ def train(cfg: DictConfig):
 
     print("-------------------------------------")
 
-    print(f"[Process {accelerate.process_index}] Starting training on device {accelerate.device} "
-          f"(total processes = {accelerate.num_processes})")
+    print(
+        f"[Process {accelerate.process_index}] Starting training on device {accelerate.device} "
+        f"(total processes = {accelerate.num_processes})"
+    )
 
-    dataset = load_dataset(cfg.dataset.name, cfg.dataset.variant, split=cfg.dataset.split)
-    device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else "cpu"
+    dataset = load_dataset(
+        cfg.dataset.name, cfg.dataset.variant, split=cfg.dataset.split
+    )
+    device = (
+        torch.accelerator.current_accelerator().type
+        if torch.accelerator.is_available()
+        else "cpu"
+    )
     texts = dataset["text"]
     tokenizer = GPT2TokenizerFast.from_pretrained("gpt2")
     if tokenizer.pad_token is None:
@@ -53,19 +68,24 @@ def train(cfg: DictConfig):
         batch_size=cfg.training.batch_size,
         shuffle=True,
         num_workers=multiprocessing.cpu_count(),
-        collate_fn=collate_fn
+        collate_fn=collate_fn,
     )
 
     # Peek one batch to check shapes
     batch = next(iter(data_loader))
-    print(f"[Process {accelerate.process_index}] Per-process batch shape: {batch['input_ids'].shape}")
+    print(
+        f"[Process {accelerate.process_index}] Per-process batch shape: {batch['input_ids'].shape}"
+    )
 
     global_batch_size = cfg.training.batch_size * accelerate.num_processes
-    print(f"[Process {accelerate.process_index}] Effective global batch size: {global_batch_size}")
+    print(
+        f"[Process {accelerate.process_index}] Effective global batch size: {global_batch_size}"
+    )
 
     steps_per_epoch = len(data_loader)  # length per process
-    print(f"[Process {accelerate.process_index}] Steps per epoch (per process): {steps_per_epoch}")
-
+    print(
+        f"[Process {accelerate.process_index}] Steps per epoch (per process): {steps_per_epoch}"
+    )
 
     model_cfg = GPT2Config(
         vocab_size=len(tokenizer),
@@ -114,15 +134,21 @@ def train(cfg: DictConfig):
 
                 shift_logits = logits[:, :-1, :].contiguous()
                 shift_labels = labels[:, 1:].contiguous()
-                loss = loss_fn(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
+                loss = loss_fn(
+                    shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1)
+                )
 
             accelerate.backward(loss)
             optimiser.step()
             lr_scheduler.step()
 
             if step % 50 == 0:
-                print(f"Epoch {epoch}, Step {step}, Loss {loss.item()}, step took {time.time() - step_start_time}")
-                print(f"[Process {accelerate.process_index}] Step 0 batch shape: {batch['input_ids'].shape}")
+                print(
+                    f"Epoch {epoch}, Step {step}, Loss {loss.item()}, step took {time.time() - step_start_time}"
+                )
+                print(
+                    f"[Process {accelerate.process_index}] Step 0 batch shape: {batch['input_ids'].shape}"
+                )
         print(f"Epoch took: {time.time() - epoch_start_time}")
         accelerate.save_state(f"{os.getcwd()}/outputs/checkpoints")
     print(f"Epoch {epoch}, Step {step}, Loss {loss.item()}")
@@ -133,4 +159,3 @@ def train(cfg: DictConfig):
 
 if __name__ == "__main__":
     train()
-    

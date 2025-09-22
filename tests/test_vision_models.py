@@ -3,8 +3,10 @@ import torch
 
 
 from PIL import Image
+from transformers import GPT2TokenizerFast
 
 
+from src.data.multimodal_dataset import MultimodalDataset
 from src.models.vision_encoder import VisionEncoder
 from src.utils.image_processor import ImageProcessor
 
@@ -30,3 +32,17 @@ def test_image_encoder():
     
     expected_features_shape = (1, 197, 768)
     assert features.shape == expected_features_shape
+
+
+def test_vqa_data_loader():
+    tokenizer = GPT2TokenizerFast.from_pretrained("gpt2")
+    tokenizer.pad_token = tokenizer.eos_token
+    
+    dataset = MultimodalDataset(
+        dataset_name="visual-layer/imagenet-1k-vl-enriched",
+        split="train",
+        tokenizer=tokenizer,
+        image_processor=ImageProcessor(),
+        max_text_length=512,
+        cache_images=False
+    )

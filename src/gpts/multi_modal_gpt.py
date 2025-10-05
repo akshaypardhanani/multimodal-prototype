@@ -82,20 +82,15 @@ class MultiModalGPT(nn.Module):
         labels: Optional[torch.Tensor] = None,
         **kwargs,
     ):
-        print(f"input_ids shape: {input_ids.shape}")
         combined_embeddings, extended_attention_mask = self.prepare_multimodal_inputs(images, input_ids, attention_mask)
-        print(f"combined_embeddings shape: {combined_embeddings.shape}")
 
         transformer_output = self.text_model.transformer(inputs_embeds=combined_embeddings, attention_mask=extended_attention_mask, **kwargs)
         hidden_states = transformer_output[0]
-        print(f"hidden_states shape: {hidden_states.shape}")
 
         # vision_tokens = (self.config.img_size // self.config.patch_size) ** 2 + 1
         text_hidden_states = hidden_states[:, self.max_vision_tokens:, :]
-        print(f"text_hidden_states shape: {text_hidden_states.shape}")
 
         lm_logits = self.text_model.lm_head(text_hidden_states)
-        print(f"lm_logits shape: {lm_logits.shape}")
 
         loss = None
 
